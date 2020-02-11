@@ -22,6 +22,9 @@ CELL_SIZE = .01
 NUM_PTS_OBSTACLE = 3
 SCAN_DOWNSAMPLE = 1
 
+angle_range = NaN
+range_maximum = NaN
+
 class OccupancyGripMap:
     def __init__(self):
         # use tf2 buffer to access transforms between existing frames in tf tree
@@ -90,8 +93,12 @@ class OccupancyGripMap:
         # YOUR CODE HERE!!! Loop through each measurement in scan_msg to get the correct angle and
         # x_start and y_start to send to your ray_trace_update function.
 
-
-
+        global angle_range
+        global range_maximum
+        range_maximum = scan_msg.range_max
+        angle_range = scan_msg.angle_increment
+        for i in range(len(scan_msg.ranges)):
+            ray_trace_update(np_map, log_odds, odom_map[0], odom_map[1], odom_map[2] + angle_increment * i - (angle_increment/2), scan_msg.ranges[i])
 
 
         # publish the message
@@ -116,15 +123,44 @@ class OccupancyGripMap:
         # ray_trace and the equations from class. Your numpy map must be an array of int8s with 0 to 100 representing
         # probability of occupancy, and -1 representing unknown.
 
+        is_over = (range_mes > range_maximum)
+        
+        for i in range(width):
+            for j in range(length):
+                log_odds[i][j] = log_odds[i][j] + log_val(self, x_start, y_start, angle, range_mes, i, j, is_over)
 
-
-
+        for i in range(width):
+            for j in range(length):
+                #TODO -1
+                map[i][j] = log_odds_to_probability(log_odds[i][j])
 
         return map, log_odds
 
     def log_odds_to_probability(self, values):
         # print(values)
         return np.exp(values) / (1 + np.exp(values))
+    
+    def log_val(self, x_start, y_start, angle, range_mes, i, j, is_over)
+        x_dest = CELL_SIZE * i + (CELL_SIZE / 2)
+        y_dest = CELL_SIZE * j + (CELL_SIZE / 2)
+        
+        #TODO if 3.5>
+        
+        Circular check
+        
+        ang = np.arctan((y_dest - y_start) / (x_dest - x_start))
+        rad2 = ((x_start - x_dest) ^ 2) + ((y_start - y_dest) ^ 2)
+        
+        if abs(ang - angle) < (angle_range / 2):
+            if rad2 <= ((range_mes - CELL_SIZE) ^ 2):
+                return BETA
+            elif rad2 > ((range_mes - CELL_SIZE) ^ 2) and rad2 <= ((range_mes) ^ 2):
+                if is_over:
+                    return ALPHA # measurement below the valid range
+                else:
+                    return BETA # measurement over the valid range
+        else:
+            return 0
 
 
 if __name__ == '__main__':
