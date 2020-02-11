@@ -12,6 +12,17 @@ NUM_ROTATIONS = 3
 TICKS_PER_ROTATION = 4096
 WHEEL_RADIUS = 0.066 / 2 #In meters
 
+left_encoders = 1
+right_encoders = 1
+old_left_encoders = -5000
+old_right_encoders = -5000
+
+delta_left = 0
+delta_right = 0
+
+b = -1
+
+
 
 class wheelBaselineEstimator():
     def __init__(self):
@@ -50,10 +61,21 @@ class wheelBaselineEstimator():
         return delPhi
 
     def sensorCallback(self, msg):
+	global delta_left, delta_right
         #Retrieve the encoder data form the sensor state msg
         self.lock.acquire()
 
         #YOUR CODE HERE!
+	if old_left_encoders is -5000 or old_right_encoders is -5000:
+		old_left_econders = msg.left_encoder
+		old_right_econders = msg.right_encoder
+	else:
+		left_econders = msg.left_encoder
+		right_econders = msg.right_encoder
+
+	delta_left = delta_left+left_encoders - old_left_encoders
+	delta_right = delta_right+right_encoders - old_right_encoders
+
         # Accumulate the encoder ticks here
         
         self.lock.release()
@@ -70,6 +92,7 @@ class wheelBaselineEstimator():
             
             #YOUR CODE HERE!
             #Calculate the wheel baseline here
+	    b = (0.033/2)*(delta_right - delta_left)/(2*3.1415926*4)
 
             #Reset the robot and calibration routine
             self.left_encoder_prev = None
@@ -79,6 +102,7 @@ class wheelBaselineEstimator():
             self.lock.release()
             reset_msg = Empty()
             self.reset_pub.publish(reset_msg)
+            print(b)
             print('Resetted the robot to calibrate again!')
 
         return
