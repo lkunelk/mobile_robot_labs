@@ -16,14 +16,14 @@ from utils import convert_pose_to_tf, convert_tf_to_pose, euler_from_ros_quat, \
 
 
 ALPHA = 1
-BETA = 1
+BETA = -1
 MAP_DIM = (4, 4)
 CELL_SIZE = .01
 NUM_PTS_OBSTACLE = 3
 SCAN_DOWNSAMPLE = 1
 
-angle_range = NaN
-range_maximum = NaN
+angle_range = None
+range_maximum = None
 
 class OccupancyGripMap:
     def __init__(self):
@@ -93,13 +93,16 @@ class OccupancyGripMap:
         # YOUR CODE HERE!!! Loop through each measurement in scan_msg to get the correct angle and
         # x_start and y_start to send to your ray_trace_update function.
 
+	print('got scan!')
+
         global angle_range
         global range_maximum
         range_maximum = scan_msg.range_max
         angle_range = scan_msg.angle_increment
-        for i in range(len(scan_msg.ranges)):
-            ray_trace_update(np_map, log_odds, odom_map[0], odom_map[1], odom_map[2] + angle_increment * i - (angle_increment/2), scan_msg.ranges[i])
+        for i in range(10):
+            self.ray_trace_update(self.np_map, self.log_odds, odom_map[0], odom_map[1], odom_map[2] + scan_msg.angle_increment * i, scan_msg.ranges[i])
 
+	print('nost stuck')
 
         # publish the message
         self.map_msg.info.map_load_time = rospy.Time.now()
@@ -124,15 +127,15 @@ class OccupancyGripMap:
         # probability of occupancy, and -1 representing unknown.
 
         is_over = (range_mes > range_maximum)
-        
+        width = int(MAP_DIM[0] / CELL_SIZE); height = int(MAP_DIM[1] / CELL_SIZE)
         for i in range(width):
-            for j in range(length):
-                log_odds[i][j] = log_odds[i][j] + log_val(self, x_start, y_start, angle, range_mes, i, j, is_over)
+            for j in range(height):
+                log_odds[i][j] = log_odds[i][j] + self.log_val(x_start, y_start, angle, range_mes, i, j, is_over)
 
         for i in range(width):
-            for j in range(length):
+            for j in range(height):
                 #TODO -1
-                map[i][j] = log_odds_to_probability(log_odds[i][j])
+                map[i][j] = self.log_odds_to_probability(log_odds[i][j]) * 100
 
         return map, log_odds
 
@@ -140,25 +143,27 @@ class OccupancyGripMap:
         # print(values)
         return np.exp(values) / (1 + np.exp(values))
     
-    def log_val(self, x_start, y_start, angle, range_mes, i, j, is_over)
+    def log_val(self, x_start, y_start, angle, range_mes, i, j, is_over):
         x_dest = CELL_SIZE * i + (CELL_SIZE / 2)
         y_dest = CELL_SIZE * j + (CELL_SIZE / 2)
         
         #TODO if 3.5>
         
-        Circular check
+        #Circular check
         
         ang = np.arctan((y_dest - y_start) / (x_dest - x_start))
-        rad2 = ((x_start - x_dest) ^ 2) + ((y_start - y_dest) ^ 2)
+        rad2 = ((x_start - x_dest) ** 2) + ((y_start - y_dest) ** 2)
         
         if abs(ang - angle) < (angle_range / 2):
-            if rad2 <= ((range_mes - CELL_SIZE) ^ 2):
+            if rad2 <= ((range_mes - CELL_SIZE) ** 2):
                 return BETA
-            elif rad2 > ((range_mes - CELL_SIZE) ^ 2) and rad2 <= ((range_mes) ^ 2):
+            elif rad2 > ((range_mes - CELL_SIZE) ** 2) and rad2 <= ((range_mes) ** 2):
                 if is_over:
                     return ALPHA # measurement below the valid range
                 else:
                     return BETA # measurement over the valid range
+	    else:
+		return 0
         else:
             return 0
 
