@@ -15,12 +15,15 @@ from utils import convert_pose_to_tf, convert_tf_to_pose, euler_from_ros_quat, \
      tf_to_tf_mat, tf_mat_to_tf
 
 
-ALPHA = 1
+ALPHA = -1
 BETA = 1
 MAP_DIM = (4, 4)
 CELL_SIZE = .01
 NUM_PTS_OBSTACLE = 3
 SCAN_DOWNSAMPLE = 1
+
+angle_range = None
+range_maximum = None
 
 class OccupancyGripMap:
     def __init__(self):
@@ -90,9 +93,16 @@ class OccupancyGripMap:
         # YOUR CODE HERE!!! Loop through each measurement in scan_msg to get the correct angle and
         # x_start and y_start to send to your ray_trace_update function.
 
+	#print('got scan!')
 
+        global angle_range
+        global range_maximum
+        range_maximum = scan_msg.range_max
+        angle_range = scan_msg.angle_increment
+        for i in range(len(scan_msg.ranges)):
+            self.np_map, self.log_odds = self.ray_trace_update(self.np_map, self.log_odds, odom_map[0], odom_map[1], odom_map[2] + scan_msg.angle_increment * i, scan_msg.ranges[i])
 
-
+	print('not stuck')
 
         # publish the message
         self.map_msg.info.map_load_time = rospy.Time.now()
@@ -116,15 +126,35 @@ class OccupancyGripMap:
         # ray_trace and the equations from class. Your numpy map must be an array of int8s with 0 to 100 representing
         # probability of occupancy, and -1 representing unknown.
 
+        is_over = (range_mes > range_maximum)
+        width = int(MAP_DIM[0] / CELL_SIZE)
+	height = int(MAP_DIM[1] / CELL_SIZE)
+	x_dest = x_start + np.cos(angle) * range_mes
+	y_dest = y_start + np.sin(angle) * range_mes
+	
+	i_start = int(y_start / CELL_SIZE)# + int(width / 2)
+	j_start = int(x_start / CELL_SIZE)# + int(height / 2)
+
+	i_dest = int(y_dest / CELL_SIZE)# + int(width / 2)
+	j_dest = int(x_dest / CELL_SIZE)# + int(height / 2)
 
 
 
+	img = np.zeros((width, height), dtype=np.uint8)
 
+	rr, cc = ray_trace(i_start, j_start, i_dest, j_dest)
+	for r,c in zip(rr, cc):
+		if 0 <= r < height and 0 <= c < width:
+			log_odds[r, c] = max(log_odds[r, c] + ALPHA, -100)
+
+	rr, cc = ray_trace(i_dest, j_dest, i_dest + NUM_PTS_OBSTACLE, j_dest + NUM_PTS_OBSTACLE)
+	for r,c in zip(rr, cc):
+		if 0 <= r < height and 0 <= c < width:
+			log_odds[r, c] = min(log_odds[r,c] + BETA, 100)
+	#img[10,10] = BETA
+	map = np.true_divide(np.exp(log_odds), (1 + np.exp(log_odds))) * 100
+	#print(log_odds)
         return map, log_odds
-
-    def log_odds_to_probability(self, values):
-        # print(values)
-        return np.exp(values) / (1 + np.exp(values))
 
 
 if __name__ == '__main__':
