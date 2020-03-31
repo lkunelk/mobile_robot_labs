@@ -8,7 +8,7 @@ function lab4()
 
     % Robot start position
     dxy = 0.1;
-    startpos = dxy*[350 250 30];
+    startpos = dxy*[350; 250; 30];
     checkpoints = dxy*[440 620; 440 665];
 
     for i=1:100
@@ -18,7 +18,7 @@ function lab4()
         
         
         % update position
-        startpos = motion([0; -1; 0],[startpos(1); startpos(2);0]);
+        startpos = motion([1; 0; 0], startpos);
         
         % Plotting
         figure(1); clf; hold on;
