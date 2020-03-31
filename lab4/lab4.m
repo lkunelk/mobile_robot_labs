@@ -37,8 +37,8 @@ function [update] = motion(vel,pose)
         heading = pose(3);
         C = [cos(heading) -sin(heading) 0; sin(heading) cos(heading) 0; 0 0 1];
         update = pose+1/5*C*vel;
-        % update(1:2) = update(1:2) + normpdf([0;0],[0 0.05^2; 0.05^2 0]);
-        % update(3) = update(3) + normpdf(0,0.02^2);
+        update(1:2) = update(1:2) + randn(1)*0.05;
+        update(3) = update(3) + randn(1)*0.02;
     end
 end
 
@@ -51,7 +51,7 @@ function [sensor_readings] = measurement(map,pose)
         for j = 0.3:0.1:10
             measurement = (C*[j;0]+pose(1:2))./dxy;
             if(map(round(measurement(1)),round(measurement(2))) == 1)
-                sensor_readings(i+35) = j;
+                sensor_readings(i+35) = j+ randn(1)*0.05;
                 
                 % plot data
                 plot(measurement(1), measurement(2), 'b-x', 'MarkerSize',5, 'LineWidth', 3 );
