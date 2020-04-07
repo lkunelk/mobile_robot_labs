@@ -26,9 +26,9 @@ class FeatureProcessor:
         return
 
     def get_image(self, id):
-        #Load image and convert to grayscale
-        img = cv2.imread(os.path.join(self.data_folder,'camera_image_{}.jpeg'.format(id)))
-        gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+        # Load image and convert to grayscale
+        img = cv2.imread(os.path.join(self.data_folder, 'camera_image_{}.jpeg'.format(id)))
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         return gray
 
     def get_features(self, id):
@@ -46,7 +46,6 @@ class FeatureProcessor:
         the actual data is the locations of each feature in each image."""
         raise NotImplementedError('Implement get_matches!')
 
-
 def triangulate(feature_data, tf, inv_K):
     """ For (u, v) image locations of a single feature for every image, as well as the corresponding
     robot poses as T matrices for every image, calculate an estimated xyz position of the feature.
@@ -56,6 +55,7 @@ def triangulate(feature_data, tf, inv_K):
 
     raise NotImplementedError('Implement triangulate!')
 
+
 def main():
     min_feature_views = 20  # minimum number of images a feature must be seen in to be considered useful
     K = np.array([[530.4669406576809, 0.0, 320.5],  # K from sim
@@ -64,12 +64,12 @@ def main():
     inv_K = np.linalg.inv(K)  # will be useful for triangulating feature locations
 
     # load in data, get consistent feature locations
-    data_folder = os.path.join(os.getcwd(),'l3_mapping_data/')
+    data_folder = os.path.join(os.getcwd(), 'l3_mapping_data/')
     f_processor = FeatureProcessor(data_folder)
     feature_locations = f_processor.get_matches()  # output shape should be (num_images, num_features, 2)
 
     # feature rejection
-    raise NotImplementedError('(Optionally) implement feature rejection! (though we strongly recommend it)')
+    # raise NotImplementedError('(Optionally) implement feature rejection! (though we strongly recommend it)')
     good_feature_locations = None  # delete this!
     num_landmarks = 0  # delete this!
 
@@ -110,7 +110,7 @@ def main():
     # fit a plane to the feature point cloud for illustration
     # see https://math.stackexchange.com/questions/99299/best-fitting-plane-given-a-set-of-points
     centroid = pc.mean(axis=0)
-    pc_minus_cent = pc - centroid # subtract centroid
+    pc_minus_cent = pc - centroid  # subtract centroid
     u, s, vh = np.linalg.svd(pc_minus_cent.T)
     normal = u.T[2]
 
@@ -122,8 +122,8 @@ def main():
     ylim = ax.get_ylim()
     X, Y = np.meshgrid(np.linspace(xlim[0], xlim[1], 10),
                        np.linspace(ylim[0], ylim[1], 10))
-    Z = (-normal[0] * X - normal[1] * Y - d) * 1. /normal[2]
-    ax.plot_wireframe(X,Y,Z, color='k')
+    Z = (-normal[0] * X - normal[1] * Y - d) * 1. / normal[2]
+    ax.plot_wireframe(X, Y, Z, color='k')
 
     # view all final good features matched on first image (to compare to point cloud)
     feat_fig = plt.figure()
@@ -136,5 +136,16 @@ def main():
     pc_fig.savefig('point_clouds.png', bbox_inches='tight')
     feat_fig.savefig('feat_fig.png', bbox_inches='tight')
 
+def nam_test():
+    data_folder = os.path.join(os.getcwd(), 'l3_mapping_data/')
+    proc = FeatureProcessor(data_folder)
+
+    # display images
+    print('num imgs:', proc.num_images)
+    for i in range(proc.num_images):
+        img = proc.get_image(i)
+        cv2.imshow('my_window', img)
+        cv2.waitKey(100)
+
 if __name__ == '__main__':
-    main()
+    nam_test()
