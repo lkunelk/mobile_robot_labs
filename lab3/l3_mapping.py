@@ -17,7 +17,8 @@ class FeatureProcessor:
         self.bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
         self.data_folder = data_folder
         self.num_images = len(glob.glob(data_folder + '*.jpeg'))
-        self.feature_match_locs = []  # [img_i, feat_i, [x, y] of match ((-1, -1) if no match)]
+        self.feature_match_locs = np.zeros(
+            (self.num_images, n_features, 2))  # [img_i, feat_i, [x, y] of match ((-1, -1) if no match)]
 
         # store the features found in the first image here. you may find it useful to store both the raw
         # keypoints in kp, and the numpy (u, v) pairs (keypoint.pt) in kp_np
@@ -31,8 +32,7 @@ class FeatureProcessor:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         return gray
 
-    def get_features(self, id):
-        """ Get the keypoints and the descriptors for features for the image with index id."""
+    def harris_features(self, id):
         gray = self.get_image(id)
         blockSize = 2
         ksize = 3
@@ -40,16 +40,49 @@ class FeatureProcessor:
         dst = cv2.cornerHarris(gray, blockSize, ksize, k)
         return dst
 
+    def get_features(self, id):
+        """ Get the keypoints and the descriptors for features for the image with index id."""
+        img = self.get_image(id)
+        kp = self.orb.detect(img, None)
+        key_points, descriptors = self.orb.compute(img, kp)
+
+        # draw only keypoints location,not size and orientation
+        # img2 = cv2.drawKeypoints(img, key_points, img, color=(255), flags=0)
+        # plt.imshow(img2)
+        # plt.show()
+
+        return key_points, descriptors
+
     def append_matches(self, matches, new_kp):
         """ Take the current matches and the current keypoints
         and append them to the list of consistent match locations. """
-        raise NotImplementedError('Implement append_matches!')
 
     def get_matches(self):
         """ Get all of the locations of features matches for each image to the features found in the
         first image. Output should be a numpy array of shape (num_images, num_features_first_image, 2), where
         the actual data is the locations of each feature in each image."""
-        raise NotImplementedError('Implement get_matches!')
+
+        img0 = self.get_image(0)
+        key_points0, descriptors0 = self.get_features(0)
+        self.features['kp'] = key_points0
+        self.features['kp_np'] = [kp.pt for kp in key_points0]
+        self.features['des'] = descriptors0
+
+        for i in range(self.num_images):
+            img = self.get_image(i)
+            key_points, descriptors = self.get_features(i)
+            matches = self.bf.match(descriptors0, descriptors)
+
+            # add match locations
+            for match in matches:
+                kp = key_points[match.trainIdx]
+                self.feature_match_locs[i][match.queryIdx] = kp.pt
+
+            # draw matches
+            img3 = cv2.drawMatches(img0, key_points0, img, key_points, matches, None, flags=2)
+            plt.imshow(img3)
+            plt.show()
+
 
 def triangulate(feature_data, tf, inv_K):
     """ For (u, v) image locations of a single feature for every image, as well as the corresponding
@@ -141,20 +174,12 @@ def main():
     pc_fig.savefig('point_clouds.png', bbox_inches='tight')
     feat_fig.savefig('feat_fig.png', bbox_inches='tight')
 
+
 def nam_test():
     data_folder = os.path.join(os.getcwd(), 'l3_mapping_data/')
     proc = FeatureProcessor(data_folder)
+    proc.get_matches()
 
-    # display images
-    print('num imgs:', proc.num_images)
-    for i in range(1):
-        img = proc.get_image(i)
-        dst = proc.get_features(i)
-
-        img[dst > 0.01 * dst.max()] = [255]
-
-        cv2.imshow('my_window', img)
-        cv2.waitKey(0)
 
 if __name__ == '__main__':
     nam_test()
