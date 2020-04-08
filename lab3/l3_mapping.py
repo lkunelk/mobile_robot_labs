@@ -33,7 +33,12 @@ class FeatureProcessor:
 
     def get_features(self, id):
         """ Get the keypoints and the descriptors for features for the image with index id."""
-        raise NotImplementedError('Implement get_features!')
+        gray = self.get_image(id)
+        blockSize = 2
+        ksize = 3
+        k = 0.04
+        dst = cv2.cornerHarris(gray, blockSize, ksize, k)
+        return dst
 
     def append_matches(self, matches, new_kp):
         """ Take the current matches and the current keypoints
@@ -142,10 +147,14 @@ def nam_test():
 
     # display images
     print('num imgs:', proc.num_images)
-    for i in range(proc.num_images):
+    for i in range(1):
         img = proc.get_image(i)
+        dst = proc.get_features(i)
+
+        img[dst > 0.01 * dst.max()] = [255]
+
         cv2.imshow('my_window', img)
-        cv2.waitKey(100)
+        cv2.waitKey(0)
 
 if __name__ == '__main__':
     nam_test()
