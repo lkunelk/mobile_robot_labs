@@ -4,9 +4,9 @@ import glob
 import numpy as np
 import cv2
 import scipy.io as sio
+import matplotlib
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-
 
 class FeatureProcessor:
     def __init__(self, data_folder, n_features=500, median_filt_multiplier=1.0):
@@ -17,8 +17,8 @@ class FeatureProcessor:
         self.bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
         self.data_folder = data_folder
         self.num_images = len(glob.glob(data_folder + '*.jpeg'))
-        self.feature_match_locs = np.zeros(
-            (self.num_images, n_features, 2))  # [img_i, feat_i, [x, y] of match ((-1, -1) if no match)]
+        self.feature_match_locs = np.ones(
+            (self.num_images, n_features, 2)) * -1  # [img_i, feat_i, [x, y] of match ((-1, -1) if no match)]
 
         # store the features found in the first image here. you may find it useful to store both the raw
         # keypoints in kp, and the numpy (u, v) pairs (keypoint.pt) in kp_np
@@ -79,9 +79,9 @@ class FeatureProcessor:
                 self.feature_match_locs[i][match.queryIdx] = kp.pt
 
             # draw matches
-            img3 = cv2.drawMatches(img0, key_points0, img, key_points, matches, None, flags=2)
-            plt.imshow(img3)
-            plt.show()
+            # img3 = cv2.drawMatches(img0, key_points0, img, key_points, matches, None, flags=2)
+            # plt.imshow(img3)
+            # plt.show()
 
 
 def triangulate(feature_data, tf, inv_K):
@@ -91,10 +91,51 @@ def triangulate(feature_data, tf, inv_K):
     You're free to use whatever method you like, but we recommend a solution based on least squares, similar
     to section 7.1 of Szeliski's book "Computer Vision: Algorithms and Applications". """
 
-    raise NotImplementedError('Implement triangulate!')
+    def compute_v_c(feature_loc, T):
+        feature = np.append(feature_loc, 1).reshape(3, 1)
+        R, c = T[:3, :3], T[:3, 3:4]
+        v = R @ inv_K @ feature
+        v = v / np.linalg.norm(v)
+        return (v, c)
+
+    cameras = []
+    v_hats = []
+
+    cvs = [compute_v_c(feature_data[i], tf[i]) for i in range(tf.shape[0]) if
+           (feature_data[i] != np.array((-1, -1))).all()]
+
+    # print(np.shape(cvs))
+
+    def ransac(cvs):
+        cvs = np.array(cvs)  # for list index
+        # hyperparameters
+        N = 3  # number of data to try
+        tol = 0.01  # tolerance
+        K = int(0.8 * len(cvs))  # threshold
+        L = 3000  # max number of iterations
+        # ransac
+        for i in range(L):
+            try:
+                rand_idx = np.random.randint(len(cvs), size=N)
+                sum_IvvT = sum([np.identity(3) - cv[0] @ cv[0].T for cv in cvs[rand_idx]])
+                sum_IvvT_c = sum([(np.identity(3) - cv[0] @ cv[0].T) @ cv[1] for cv in cvs[rand_idx]])
+                pc = np.linalg.inv(sum_IvvT) @ sum_IvvT_c
+                # compute error
+                r_sq = [np.linalg.norm((np.identity(3) - cv[0] @ cv[0].T) @ (pc - cv[1])) for cv in cvs]
+                k = sum(np.array(r_sq) < tol)
+                if k > K:
+                    return pc.T
+            except np.linalg.LinAlgError:
+                continue  # singular matrix, this
+        return np.ones(3)*0
+
+    pc = ransac(cvs)
+
+    return pc
 
 
 def main():
+
     min_feature_views = 20  # minimum number of images a feature must be seen in to be considered useful
     K = np.array([[530.4669406576809, 0.0, 320.5],  # K from sim
                   [0.0, 530.4669406576809, 240.5],
@@ -103,13 +144,26 @@ def main():
 
     # load in data, get consistent feature locations
     data_folder = os.path.join(os.getcwd(), 'l3_mapping_data/')
-    f_processor = FeatureProcessor(data_folder)
-    feature_locations = f_processor.get_matches()  # output shape should be (num_images, num_features, 2)
+    f_processor = FeatureProcessor(data_folder, n_features=100)
+    f_processor.get_matches()  # output shape should be (num_images, num_features, 2)
 
     # feature rejection
-    # raise NotImplementedError('(Optionally) implement feature rejection! (though we strongly recommend it)')
-    good_feature_locations = None  # delete this!
-    num_landmarks = 0  # delete this!
+    good_feature_locations = f_processor.feature_match_locs
+    print(np.shape(good_feature_locations))
+    feat_to_remove = []
+    for feat_i in range(f_processor.n_features):
+        count = 0
+        for img_i in range(f_processor.num_images):
+            if not good_feature_locations[img_i][feat_i][0] == -1:
+                count+=1
+        if count < 50:
+            feat_to_remove.append(feat_i)
+
+    for feat_i in reversed(feat_to_remove):
+        good_feature_locations = np.delete(good_feature_locations, feat_i, 1)
+
+    print(np.shape(good_feature_locations))
+    num_landmarks = good_feature_locations.shape[1]
 
     pc = np.zeros((num_landmarks, 3))
 
@@ -169,6 +223,7 @@ def main():
     ax.imshow(f_processor.get_image(0), cmap='gray')
     ax.scatter(good_feature_locations[0, :, 0], good_feature_locations[0, :, 1], marker='^', color=colors)
 
+    plt.interactive(True)
     plt.show()
 
     pc_fig.savefig('point_clouds.png', bbox_inches='tight')
@@ -182,4 +237,4 @@ def nam_test():
 
 
 if __name__ == '__main__':
-    nam_test()
+    main()
