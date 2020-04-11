@@ -106,32 +106,31 @@ def triangulate(feature_data, tf, inv_K):
 
     # Ransac
     n = 3
-    tol = 0.03  # tolerance
+    tolerance = 0.03
     K = int(0.7 * len(cams))  # threshold
     L = 2000  # max number of iterations
 
-    for i in range(L):
-        rand_idx = np.random.randint(len(cams), size=n)
+    for _ in range(L):
+        sum1 = np.zeros((3, 3))
+        sum2 = np.zeros((3, 1))
 
-        sum_IvvT = np.zeros((3, 3))
-        sum_IvvT_c = np.zeros((3, 1))
-        for i in rand_idx:
+        for i in np.random.randint(len(cams), size=n):
             v = v_hats[i]
             c = cams[i]
-            sum_IvvT += np.identity(3) - v @ v.T
-            sum_IvvT_c += (np.identity(3) - v @ v.T) @ c
-        # print(sum_IvvT.shape, sum_IvvT_c.shape)
-        pc = np.linalg.inv(sum_IvvT) @ sum_IvvT_c
+            sum1 += np.identity(3) - v @ v.T
+            sum2 += (np.identity(3) - v @ v.T) @ c
 
-        # compute error
-        r_sq = []
+        p = np.linalg.inv(sum1) @ sum2
+
+        error = []
         for v, c in zip(v_hats, cams):
-            r_sq.append(np.linalg.norm((np.identity(3) - v @ v.T) @ (pc - c)))
-        k = sum(np.array(r_sq) < tol)
+            error.append(np.linalg.norm((np.identity(3) - v @ v.T) @ (p - c)))
+        k = sum(np.array(error) < tolerance)
+
         if k > K:
-            print(L)
             break
-    return pc.T
+
+    return p.T
 
 
 def main():
@@ -147,6 +146,7 @@ def main():
     f_processor.get_matches()  # output shape should be (num_images, num_features, 2)
 
     # feature rejection
+    n_good_matches = 50
     good_feature_locations = f_processor.feature_match_locs
     print(np.shape(good_feature_locations))
     feat_to_remove = []
@@ -155,7 +155,7 @@ def main():
         for img_i in range(f_processor.num_images):
             if not good_feature_locations[img_i][feat_i][0] == -1:
                 count += 1
-        if count < 50:
+        if count < n_good_matches:
             feat_to_remove.append(feat_i)
 
     for feat_i in reversed(feat_to_remove):
