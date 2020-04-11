@@ -8,6 +8,7 @@ import matplotlib
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+
 class FeatureProcessor:
     def __init__(self, data_folder, n_features=500, median_filt_multiplier=1.0):
         # Initiate ORB detector and the brute force matcher
@@ -90,52 +91,50 @@ def triangulate(feature_data, tf, inv_K):
 
     You're free to use whatever method you like, but we recommend a solution based on least squares, similar
     to section 7.1 of Szeliski's book "Computer Vision: Algorithms and Applications". """
-
-    def compute_v_c(feature_loc, T):
-        feature = np.append(feature_loc, 1).reshape(3, 1)
-        R, c = T[:3, :3], T[:3, 3:4]
-        v = R @ inv_K @ feature
-        v = v / np.linalg.norm(v)
-        return (v, c)
-
-    cameras = []
+    cams = []
     v_hats = []
 
-    cvs = [compute_v_c(feature_data[i], tf[i]) for i in range(tf.shape[0]) if
-           (feature_data[i] != np.array((-1, -1))).all()]
+    for feat, t in zip(feature_data, tf):
+        if not feat[0] == -1:
+            feat = np.append(feat, 1).reshape(3, 1)
+            r, c = t[:3, :3], t[:3, 3:4]
+            v = r @ inv_K @ feat
+            v = v / np.linalg.norm(v)
 
-    # print(np.shape(cvs))
+            cams.append(c)
+            v_hats.append(v)
 
-    def ransac(cvs):
-        cvs = np.array(cvs)  # for list index
-        # hyperparameters
-        N = 3  # number of data to try
-        tol = 0.01  # tolerance
-        K = int(0.8 * len(cvs))  # threshold
-        L = 3000  # max number of iterations
-        # ransac
-        for i in range(L):
-            try:
-                rand_idx = np.random.randint(len(cvs), size=N)
-                sum_IvvT = sum([np.identity(3) - cv[0] @ cv[0].T for cv in cvs[rand_idx]])
-                sum_IvvT_c = sum([(np.identity(3) - cv[0] @ cv[0].T) @ cv[1] for cv in cvs[rand_idx]])
-                pc = np.linalg.inv(sum_IvvT) @ sum_IvvT_c
-                # compute error
-                r_sq = [np.linalg.norm((np.identity(3) - cv[0] @ cv[0].T) @ (pc - cv[1])) for cv in cvs]
-                k = sum(np.array(r_sq) < tol)
-                if k > K:
-                    return pc.T
-            except np.linalg.LinAlgError:
-                continue  # singular matrix, this
-        return np.ones(3)*0
+    # Ransac
+    n = 3
+    tol = 0.03  # tolerance
+    K = int(0.7 * len(cams))  # threshold
+    L = 2000  # max number of iterations
 
-    pc = ransac(cvs)
+    for i in range(L):
+        rand_idx = np.random.randint(len(cams), size=n)
 
-    return pc
+        sum_IvvT = np.zeros((3, 3))
+        sum_IvvT_c = np.zeros((3, 1))
+        for i in rand_idx:
+            v = v_hats[i]
+            c = cams[i]
+            sum_IvvT += np.identity(3) - v @ v.T
+            sum_IvvT_c += (np.identity(3) - v @ v.T) @ c
+        # print(sum_IvvT.shape, sum_IvvT_c.shape)
+        pc = np.linalg.inv(sum_IvvT) @ sum_IvvT_c
+
+        # compute error
+        r_sq = []
+        for v, c in zip(v_hats, cams):
+            r_sq.append(np.linalg.norm((np.identity(3) - v @ v.T) @ (pc - c)))
+        k = sum(np.array(r_sq) < tol)
+        if k > K:
+            print(L)
+            break
+    return pc.T
 
 
 def main():
-
     min_feature_views = 20  # minimum number of images a feature must be seen in to be considered useful
     K = np.array([[530.4669406576809, 0.0, 320.5],  # K from sim
                   [0.0, 530.4669406576809, 240.5],
@@ -144,7 +143,7 @@ def main():
 
     # load in data, get consistent feature locations
     data_folder = os.path.join(os.getcwd(), 'l3_mapping_data/')
-    f_processor = FeatureProcessor(data_folder, n_features=100)
+    f_processor = FeatureProcessor(data_folder, n_features=500)
     f_processor.get_matches()  # output shape should be (num_images, num_features, 2)
 
     # feature rejection
@@ -155,7 +154,7 @@ def main():
         count = 0
         for img_i in range(f_processor.num_images):
             if not good_feature_locations[img_i][feat_i][0] == -1:
-                count+=1
+                count += 1
         if count < 50:
             feat_to_remove.append(feat_i)
 
