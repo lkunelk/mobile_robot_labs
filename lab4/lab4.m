@@ -10,8 +10,15 @@ function lab4()
     dxy = 0.1;
     startpos = dxy*[350; 250; 30];
     checkpoints = dxy*[440 620; 440 665];
+    readings = measurement(map, startpos);
+    heading = compare_guide(readings);
+    array = ones(1,20) * heading;
+    %array = zeros(1,20);
+    coeff = ones(1,20);
+    %coeff = 1:20;
+    coeff = normalize(coeff,'range');
 %0.1 m x 0.1 m
-    for i=1:900
+    for i=1:2000
         
         % read sensor data
         readings = measurement(map, startpos);
@@ -19,8 +26,18 @@ function lab4()
         
         % update position
         heading = compare_guide(readings);
-        [c, move] = distance_guide2(readings, 3);
-        startpos = motion([c; 1*-1; heading], startpos);
+        array = array(2:end);
+        array(end+1) = heading;
+        % array = num2cell(cat(2, array{2:end}, heading), 1, ones(size(array)));
+        heading_new = coeff * array';
+        
+        [c, move] = distance_guide2(readings, 2);
+        if abs(c) > 5
+            y_move = 0;
+        else
+            y_move = ((20 - (heading_new + c)))*0.01;
+        end
+        startpos = motion([c; y_move*-1; heading_new], startpos);
         
         %check distance
         
@@ -75,6 +92,8 @@ end
 
 %% maintain a parallel direction to the wall
 function heading_angle = compare_guide(sensor_reading)
+    MAX_VAL = 5;
+    
     right_cum_dist = 0;
     left_cum_dist = 0;
     right_valid = 0;
@@ -102,22 +121,29 @@ function heading_angle = compare_guide(sensor_reading)
 
     
     
-    K_ang = 0.5;
+    K_ang = 1;
     if right_valid > right_zeros
         right_val = (right_cum_dist / right_valid);
     else
-        right_val = 20;
+        right_val = 10;
     end
     
     if left_valid > left_zeros
         left_val = (left_cum_dist / left_valid);
     else
-        left_val = 20;
+        left_val = 10;
     end
     
     heading_angle = K_ang * (right_val - left_val);
 
+    if abs(heading_angle) > MAX_VAL
+        heading_angle = abs(MAX_VAL) * sign(heading_angle);
+    end
 end
+%% 
+
+
+
 
 %% maintain a distance to the wall using the middle point
 function [c, move] = distance_guide1(sensor_readings, distance)
