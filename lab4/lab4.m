@@ -9,13 +9,14 @@ function lab4()
     % Robot start position
     dxy = 0.1;
     startpos = dxy*[350; 250; 30];
+    %startpos = dxy*[750; 450; 180];
     checkpoints = dxy*[440 620; 440 665];
     readings = measurement(map, startpos);
     heading = compare_guide(readings);
-    array = ones(1,20) * heading;
+    array = ones(1,30) * heading;
     %array = zeros(1,20);
-    coeff = ones(1,20);
-    %coeff = 1:20;
+    %coeff = ones(1,20);
+    coeff = 1:30;
     coeff = normalize(coeff,'range');
 %0.1 m x 0.1 m
     for i=1:2000
@@ -35,9 +36,9 @@ function lab4()
         if abs(c) > 5
             y_move = 0;
         else
-            y_move = ((20 - (heading_new + c)))*0.01;
+            y_move = ((100 - (heading_new + 10*c)))*0.001;
         end
-        startpos = motion([c; y_move*-1; heading_new], startpos);
+        startpos = motion([c; 5*y_move*-1; heading_new], startpos);
         
         %check distance
         
@@ -121,7 +122,7 @@ function heading_angle = compare_guide(sensor_reading)
 
     
     
-    K_ang = 1;
+    K_ang = 0.1;
     if right_valid > right_zeros
         right_val = (right_cum_dist / right_valid);
     else
