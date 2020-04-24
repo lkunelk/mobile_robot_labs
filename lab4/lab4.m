@@ -18,8 +18,12 @@ function lab4()
     %coeff = ones(1,20);
     coeff = 1:30;
     coeff = normalize(coeff,'range');
-%0.1 m x 0.1 m
-    for i=1:2000
+    %0.1 m x 0.1 m
+    
+    steps = 2000;
+    trajectory = zeros(steps, 2);
+    
+    for i=1:steps
         
         % read sensor data
         readings = measurement(map, startpos);
@@ -44,12 +48,20 @@ function lab4()
         
         %change heading
         
+        % save variables
+        trajectory(i,:) = startpos(1:2);
+        
         % Plotting
-        figure(1); clf; hold on;
+        figure(1);
+        clf;
+        hold on;
         colormap('gray');
         imagesc(1-map');
-        plot(startpos(1)/dxy, startpos(2)/dxy, 'ro', 'MarkerSize',10, 'LineWidth', 3);
+        plot(startpos(1)/dxy, startpos(2)/dxy, 'ro', 'MarkerSize',5, 'LineWidth', 2);
         plot(checkpoints(:,1)/dxy, checkpoints(:,2)/dxy, 'g-x', 'MarkerSize',10, 'LineWidth', 3 );
+        for j=1:5:i
+            plot(trajectory(j,1)/dxy, trajectory(j,2)/dxy, 'bo', 'MarkerSize', 1, 'LineWidth', 1);
+        end
         xlabel('North (decimeters)')
         ylabel('East (decimeters)')
         axis equal
@@ -78,7 +90,7 @@ function [sensor_readings] = measurement(map,pose)
                 sensor_readings(i+35) = j+ randn(1)*0.05;
                 
                 % plot data
-                plot(measurement(1), measurement(2), 'b-x', 'MarkerSize',5, 'LineWidth', 3 );
+                plot(measurement(1), measurement(2), 'g-x', 'MarkerSize',3, 'LineWidth', 1 );
                 
                 break;
             end
