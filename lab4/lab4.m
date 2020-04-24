@@ -13,10 +13,10 @@ function lab4()
     checkpoints = dxy*[440 620; 440 665];
     readings = measurement(map, startpos);
     heading = compare_guide(readings);
-    array = ones(1,30) * heading;
     %array = zeros(1,20);
     %coeff = ones(1,20);
     coeff = 1:30;
+    array = ones(1,30) * heading;
     coeff = normalize(coeff,'range');
     %0.1 m x 0.1 m
     
@@ -38,11 +38,11 @@ function lab4()
         array(end+1) = heading;
         % array = num2cell(cat(2, array{2:end}, heading), 1, ones(size(array)));
         heading_new = coeff * array';
-        [c, move] = distance_guide2(readings, 2);
+        [c, move] = distance_guide2(readings, 1.5);
         if abs(c) > 5
             y_move = 0;
         else
-            y_move = ((100 - (heading_new + 10*c)))*0.001;
+            y_move = (((100 - (5*heading_new + 5*c))))^2*0.00001;
         end
         startpos = motion([c; 5*y_move*-1; heading_new], startpos);
         
@@ -74,7 +74,7 @@ function [update] = motion(vel,pose)
     if(vel(1)<20 && vel(2)<20)
         heading = pose(3);
         C = [cos(heading) -sin(heading) 0; sin(heading) cos(heading) 0; 0 0 1];
-        update = pose+1/5*C*vel;
+        update = pose + 1/2 * C * vel;
         update(1:2) = update(1:2) + randn(1)*0.05;
         update(3) = update(3) + randn(1)*0.02;
     end
