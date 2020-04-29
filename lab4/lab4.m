@@ -2,16 +2,18 @@
 function lab4()
     % Aerial racing
     I = imread('Racecourse.png');
-    map = im2bw(I, 0.4); % Convert to 0-1 image
-    map = flipud(1-map)'; % Convert to 0 free, 1 occupied and flip.
-    [M,N]= size(map); % Map size
+    true_map = im2bw(I, 0.4); % Convert to 0-1 image
+    true_map = flipud(1-true_map)'; % Convert to 0 free, 1 occupied and flip.
+    [M,N]= size(true_map); % Map size
 
+    map = ones(M, N) * 0.5;
+    
     % Robot start position
     dxy = 0.1;
     startpos = dxy*[350; 250; 30];
     %startpos = dxy*[750; 450; 180];
     checkpoints = dxy*[440 620; 440 665];
-    readings = measurement(map, startpos);
+    [readings, map] = measurement(true_map, map, startpos);
     heading = compare_guide(readings);
     %array = zeros(1,20);
     %coeff = ones(1,20);
@@ -22,11 +24,14 @@ function lab4()
     
     steps = 2000;
     trajectory = zeros(steps, 2);
+    cur_pos = startpos;
     
     for i=1:steps
         
+        i
+        
         % read sensor data
-        readings = measurement(map, startpos);
+        [readings, map] = measurement(true_map, map, cur_pos);
         
         
         % update position
@@ -44,31 +49,56 @@ function lab4()
         else
             y_move = (((100 - (5*heading_new + 5*c))))^2*0.00001;
         end
-        startpos = motion([c; 5*y_move*-1; heading_new], startpos);
+        cur_pos = motion([c; 5*y_move*-1; heading_new], cur_pos);
         
         %check distance
         
         %change heading
         
         % save variables
-        trajectory(i,:) = startpos(1:2);
+        trajectory(i,:) = cur_pos(1:2);
         
-        % Plotting
-        figure(1);
-        clf;
-        hold on;
-        colormap('gray');
-        imagesc(1-map');
-        plot(startpos(1)/dxy, startpos(2)/dxy, 'ro', 'MarkerSize',5, 'LineWidth', 2);
-        plot(checkpoints(:,1)/dxy, checkpoints(:,2)/dxy, 'g-x', 'MarkerSize',10, 'LineWidth', 3 );
-        for j=1:5:i
-            plot(trajectory(j,1)/dxy, trajectory(j,2)/dxy, 'bo', 'MarkerSize', 1, 'LineWidth', 1);
+        if mod(i,250) == 0
+            % Plotting
+            figureX = figure;
+            clf;
+            hold on;
+            colormap('gray');
+            imagesc(1-map');
+            plot(startpos(1)/dxy, startpos(2)/dxy, 'ro', 'MarkerSize',5, 'LineWidth', 2);
+            plot(checkpoints(:,1)/dxy, checkpoints(:,2)/dxy, 'g-x', 'MarkerSize',10, 'LineWidth', 3 );
+            for j=1:2:steps
+                plot(trajectory(j,1)/dxy, trajectory(j,2)/dxy, 'bo', 'MarkerSize', 1, 'LineWidth', 1);
+            end
+            xlabel('North (decimeters)')
+            ylabel('East (decimeters)')
+            axis equal
+            file_name = 'picture' + string(i/250) + '.png';
+            saveas(figureX,file_name);
         end
-        xlabel('North (decimeters)')
-        ylabel('East (decimeters)')
-        axis equal
+        
+        if norm(cur_pos(1:2) - startpos(1:2)) < 5 && i > 1000
+            break
+        end
     end
+   
+    % Plotting
+    figureX = figure;
+    clf;
+    hold on;
+    colormap('gray');
+    imagesc(1-map');
+    plot(startpos(1)/dxy, startpos(2)/dxy, 'ro', 'MarkerSize',5, 'LineWidth', 2);
+    plot(checkpoints(:,1)/dxy, checkpoints(:,2)/dxy, 'g-x', 'MarkerSize',10, 'LineWidth', 3 );
+    for j=1:2:steps
+        plot(trajectory(j,1)/dxy, trajectory(j,2)/dxy, 'bo', 'MarkerSize', 1, 'LineWidth', 1);
+    end
+    xlabel('North (decimeters)')
+    ylabel('East (decimeters)')
+    axis equal
+    saveas(figureX,'final.png')
 end
+
 
 function [update] = motion(vel,pose)
     if(vel(1)<20 && vel(2)<20)
@@ -80,7 +110,7 @@ function [update] = motion(vel,pose)
     end
 end
 
-function [sensor_readings] = measurement(map,pose)
+function [sensor_readings, map] = measurement(true_map, map, pose)
     dxy = 0.1;
     sensor_readings = zeros(69,1);
     for i = -34:34
@@ -88,13 +118,18 @@ function [sensor_readings] = measurement(map,pose)
         C = [cos(heading) -sin(heading); sin(heading) cos(heading)];
         for j = 0.3:0.1:10
             measurement = (C*[j;0]+pose(1:2))./dxy;
-            if(map(round(measurement(1)),round(measurement(2))) == 1)
+            x = round(measurement(1));
+            y = round(measurement(2));
+            if(true_map(x, y) == 1)
+                map(x, y) = 1;
                 sensor_readings(i+35) = j+ randn(1)*0.05;
                 
                 % plot data
-                plot(measurement(1), measurement(2), 'g-x', 'MarkerSize',3, 'LineWidth', 1 );
+                % plot(measurement(1), measurement(2), 'g-x', 'MarkerSize',3, 'LineWidth', 1 );
                 
                 break;
+            else
+                map(x, y) = 0;
             end
         end
     end
