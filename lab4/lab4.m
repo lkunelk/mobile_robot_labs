@@ -97,6 +97,8 @@ function lab4()
     ylabel('East (decimeters)')
     axis equal
     saveas(figureX,'final.png')
+    
+    close all;
 end
 
 
