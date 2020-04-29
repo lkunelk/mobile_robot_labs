@@ -47,7 +47,7 @@ function lab4()
         if abs(c) > 5
             y_move = 0;
         else
-            y_move = (((100 - (5*heading_new + 5*c))))^2*0.00001;
+            y_move = (((95 - (5*heading_new + 5*c))))^2*0.00001;
         end
         cur_pos = motion([c; 5*y_move*-1; heading_new], cur_pos);
         
@@ -97,7 +97,6 @@ function lab4()
     ylabel('East (decimeters)')
     axis equal
     saveas(figureX,'final.png')
-    
     close all;
 end
 
